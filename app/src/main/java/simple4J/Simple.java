@@ -2,13 +2,18 @@ package simple4j;
 
 import static org.lwjgl.glfw.GLFW.*;
 
+import java.util.ArrayDeque;
+import java.util.Queue;
+
+
 import org.apache.logging.log4j.Logger;
 import org.apache.logging.log4j.LogManager;
 import org.lwjgl.glfw.GLFWErrorCallback;
 
 public class Simple {
-
   private static final Logger log = LogManager.getLogger(Simple.class);
+
+  public static Queue<Window> removeQueue = new ArrayDeque<>();
 
   private static boolean glfwInitialized = false;
 
@@ -19,7 +24,7 @@ public class Simple {
       return;
     GLFWErrorCallback.createPrint(System.err).set();
 
-    if (!glfwInit()){
+    if (!glfwInit()) {
       log.fatal("Unable to initialize GLFW");
       throw new IllegalStateException("Unable to initialize GLFW");
     }
@@ -37,11 +42,25 @@ public class Simple {
   }
 
   public static void render() {
-    // log.info("Started Simple rendering...");
-    // while (Window.getCount() != 0) {
-    //   glfwWaitEvents();{}
-    // }
-    // terminate();
+    log.info("Started Simple rendering...");
+    while (Window.windows.size() > 0) {
+      glfwWaitEvents(); // should be addded
+
+      while (!removeQueue.isEmpty()) {
+        Window window = removeQueue.poll();
+        if (window != null) {
+          log.debug("Destroying window {}", window.getTitle());
+          try {
+            window.getRenderingThread().join();
+          } catch (InterruptedException e) {
+            log.error("Interrupted while waiting for rendering thread to finish", e);
+            // Thread.currentThread().interrupt()
+          }
+          glfwDestroyWindow(window.getWindowHandle());
+        }
+      }
+    }
+    terminate();
   }
 
   private static void terminate() {

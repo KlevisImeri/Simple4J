@@ -3,29 +3,23 @@ package simple4j;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.lwjgl.glfw.*;
-import org.lwjgl.system.*;
-
-import java.nio.*;
-
 import static org.lwjgl.glfw.Callbacks.*;
 import static org.lwjgl.glfw.GLFW.*;
-import static org.lwjgl.system.MemoryStack.*;
 import static org.lwjgl.system.MemoryUtil.*;
 
-public class Window {
-  private static final Logger logger = LogManager.getLogger(Window.class);
-  private static int count = 0;
+import java.util.ArrayList;
+import java.util.List;
 
-  public static int getCount() {
-    return count;
-  }
-  public static void decrementCount() {
-    count--;
-  }
+public class Window {
+  private static final Logger log = LogManager.getLogger(Window.class);
+
+  public static List<Window> windows = new ArrayList<Window>();
 
   private long windowHandle;
   private int width, height;
   private String title;
+
+  private RenderingThread renderingThread;
 
   public Window() {
     this(800, 600, "Simple Window");
@@ -42,55 +36,46 @@ public class Window {
     init();
   }
 
-  
   private void init() {
-    logger.info("Initializing window: {} ({}x{})", title, width, height);
+    log.info("Initializing window: {} ({}x{})", title, width, height);
     windowHandle = glfwCreateWindow(width, height, title, NULL, NULL);
-    if (windowHandle == NULL){
-      logger.fatal("Failed to create the GLFW window!");
+    if (windowHandle == NULL) {
+      log.fatal("Failed to create the GLFW window!");
       throw new RuntimeException("Failed to create the GLFW window");
     }
 
     // Setup a key callback
     glfwSetKeyCallback(windowHandle, (windowHandle, key, scancode, action, mods) -> {
-      if (key == GLFW_KEY_ESCAPE && action == GLFW_RELEASE)
-        logger.debug("Escape key pressed, closing window");
+      if (key == GLFW_KEY_ESCAPE && action == GLFW_RELEASE) {
+        log.debug("Escape key pressed, closing window");
         glfwSetWindowShouldClose(windowHandle, true);
+      }
     });
 
-    // Get the thread stack and push a new frame
-    try (MemoryStack stack = stackPush()) {
-      IntBuffer pWidth = stack.mallocInt(1);
-      IntBuffer pHeight = stack.mallocInt(1);
-
-      // Get the window size passed to glfwCreateWindow
-      glfwGetWindowSize(windowHandle, pWidth, pHeight);
-
-      // Get the resolution of the primary monitor
-      GLFWVidMode vidmode = glfwGetVideoMode(glfwGetPrimaryMonitor());
-
-      // Center the window
-      glfwSetWindowPos(
-          windowHandle,
-          (vidmode.width() - pWidth.get(0)) / 2,
-          (vidmode.height() - pHeight.get(0)) / 2);
-    } // the stack frame is popped automatically
+    GLFWVidMode vidmode = glfwGetVideoMode(glfwGetPrimaryMonitor());
+    // Center the window
+    glfwSetWindowPos(
+        windowHandle,
+        (vidmode.width() - width) / 2,
+        (vidmode.height() - height) / 2);
 
     glfwShowWindow(windowHandle);
-    count++;
-    logger.info("Window initialized successfully");
-
-    logger.info("Starting RederingThread for window {}", title);
-    new RenderingThread(this).start();
+    windows.add(this);
+    log.info("Window initialized successfully");
+    
+    renderingThread = new RenderingThread(this);
+    renderingThread.setName("Thread-"+getTitle());
+    renderingThread.start();
   }
 
   public void render() {
-    // logger.debug("Rendering window: {}", title);
+    // log.debug("Rendering window: {}", title);
   }
 
-  public void cleanup() {
+  public void remove() {
     glfwFreeCallbacks(windowHandle);
-    glfwDestroyWindow(windowHandle);
+    windows.remove(this);
+    Simple.removeQueue.add(this);
   }
 
   public long getWindowHandle() {
@@ -103,5 +88,13 @@ public class Window {
 
   public int getHeight() {
     return height;
+  }
+
+  public String getTitle() {
+    return title;
+  }
+
+  public RenderingThread getRenderingThread(){
+    return renderingThread;
   }
 }
