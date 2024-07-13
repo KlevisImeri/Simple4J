@@ -7,12 +7,8 @@ public class App {
   private static final Logger log = LogManager.getLogger(App.class);
 
   public static void main(String[] args) {
-    Simple.init();
-
     new Window("Window 1");
-    new Window("Window 2");
+    new Thread(() -> new Window("Window 2")).start();
     new Window("Window 3");
-
-    Simple.render();
   }
 }

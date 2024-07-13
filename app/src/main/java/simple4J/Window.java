@@ -7,13 +7,9 @@ import static org.lwjgl.glfw.Callbacks.*;
 import static org.lwjgl.glfw.GLFW.*;
 import static org.lwjgl.system.MemoryUtil.*;
 
-import java.util.ArrayList;
-import java.util.List;
 
 public class Window {
   private static final Logger log = LogManager.getLogger(Window.class);
-
-  public static List<Window> windows = new ArrayList<Window>();
 
   private long windowHandle;
   private int width, height;
@@ -33,25 +29,40 @@ public class Window {
     this.width = width;
     this.height = height;
     this.title = title;
-    init();
+    SimpleRuntime.getInstance().addWindow(this);
+    SimpleRuntime.getInstance().run();
   }
 
-  private void init() {
+  /**
+   * The initialization of a window should only 
+   * be done from the main SimpleRuntime
+   */
+  public void init() {
+    createWindowHandle();
+    setCallbacks();
+    setUpWindow();
+    setUpRenderingThread();
+  }
+
+  private void createWindowHandle() {
     log.info("Initializing window: {} ({}x{})", title, width, height);
     windowHandle = glfwCreateWindow(width, height, title, NULL, NULL);
     if (windowHandle == NULL) {
       log.fatal("Failed to create the GLFW window!");
       throw new RuntimeException("Failed to create the GLFW window");
     }
+  }
 
-    // Setup a key callback
+  private void setCallbacks() {
     glfwSetKeyCallback(windowHandle, (windowHandle, key, scancode, action, mods) -> {
       if (key == GLFW_KEY_ESCAPE && action == GLFW_RELEASE) {
         log.debug("Escape key pressed, closing window");
         glfwSetWindowShouldClose(windowHandle, true);
       }
     });
+  }
 
+  private void setUpWindow() {
     GLFWVidMode vidmode = glfwGetVideoMode(glfwGetPrimaryMonitor());
     // Center the window
     glfwSetWindowPos(
@@ -60,22 +71,23 @@ public class Window {
         (vidmode.height() - height) / 2);
 
     glfwShowWindow(windowHandle);
-    windows.add(this);
     log.info("Window initialized successfully");
-    
+  }
+
+  private void setUpRenderingThread() {
     renderingThread = new RenderingThread(this);
-    renderingThread.setName("Thread-"+getTitle());
+    renderingThread.setName("Thread-" + getTitle());
     renderingThread.start();
   }
 
-  public void render() {
+  // rendering is done in another thread;
+  public void render() { // here comes what you render in everyframe
     // log.debug("Rendering window: {}", title);
   }
 
   public void remove() {
     glfwFreeCallbacks(windowHandle);
-    windows.remove(this);
-    Simple.removeQueue.add(this);
+    SimpleRuntime.getInstance().destroyWindow(this);
   }
 
   public long getWindowHandle() {
@@ -94,7 +106,7 @@ public class Window {
     return title;
   }
 
-  public RenderingThread getRenderingThread(){
+  public RenderingThread getRenderingThread() {
     return renderingThread;
   }
 }
